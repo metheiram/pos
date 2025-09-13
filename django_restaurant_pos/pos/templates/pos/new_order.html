@@ -1,0 +1,300 @@
+{% extends 'pos/base.html' %}
+
+{% block title %}New Order - Restaurant POS{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">New Order</h1>
+            <p class="text-gray-600">Create a new order for customers</p>
+        </div>
+        <a href="{% url 'pos:order_list' %}" 
+           class="flex items-center px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors">
+            <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i>
+            Back to Orders
+        </a>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Menu Selection -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-sm p-6 fade-in">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Menu Items</h2>
+                
+                <!-- Category Filter -->
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <button onclick="filterByCategory('all')" 
+                            class="category-btn active px-4 py-2 rounded-lg font-medium transition-all">
+                        All Items
+                    </button>
+                    {% for category in categories %}
+                    <button onclick="filterByCategory('{{ category.id }}')" 
+                            class="category-btn px-4 py-2 rounded-lg font-medium transition-all">
+                        {{ category.name }}
+                    </button>
+                    {% endfor %}
+                </div>
+                
+                <!-- Menu Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 custom-scrollbar max-h-96 overflow-y-auto">
+                    {% for item in menu_items %}
+                    <div class="menu-item border rounded-lg p-4 hover:shadow-md transition-all hover-scale cursor-pointer"
+                         data-category="{{ item.category.id }}"
+                         data-item-id="{{ item.id }}"
+                         data-item-name="{{ item.name }}"
+                         data-item-price="{{ item.price }}"
+                         onclick="addToOrder(this)">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-semibold text-gray-900">{{ item.name }}</h3>
+                            <span class="text-lg font-bold text-blue-600">${{ item.price }}</span>
+                        </div>
+                        <p class="text-gray-600 text-sm mb-3">{{ item.description|truncatechars:80 }}</p>
+                        <div class="flex items-center justify-between">
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {{ item.category.name }}
+                            </span>
+                            <button class="flex items-center text-blue-600 hover:text-blue-700 transition-colors">
+                                <i data-lucide="plus" class="w-4 h-4 mr-1"></i>
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Order Summary -->
+        <div>
+            <div class="bg-white rounded-xl shadow-sm p-6 fade-in sticky top-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Order Details</h2>
+                
+                <!-- Order Form -->
+                <form method="post" id="order-form">
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Table</label>
+                        {{ form.table }}
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Customer Name</label>
+                        {{ form.customer_name }}
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                        {{ form.notes }}
+                    </div>
+                    
+                    <!-- Order Items -->
+                    <div class="mb-6">
+                        <h3 class="font-medium text-gray-900 mb-3">Order Items</h3>
+                        <div id="order-items" class="space-y-2 custom-scrollbar max-h-48 overflow-y-auto">
+                            <div class="text-center text-gray-500 py-8">
+                                <i data-lucide="shopping-cart" class="w-8 h-8 mx-auto mb-2"></i>
+                                <p class="text-sm">No items added yet</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Order Summary -->
+                    <div class="border-t pt-4 mb-6">
+                        <div class="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>Subtotal:</span>
+                            <span id="subtotal">$0.00</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>Tax (8%):</span>
+                            <span id="tax">$0.00</span>
+                        </div>
+                        <div class="flex justify-between text-lg font-semibold text-gray-900 border-t pt-2">
+                            <span>Total:</span>
+                            <span id="total">$0.00</span>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" 
+                            id="create-order-btn"
+                            disabled
+                            class="w-full bg-gray-300 text-gray-500 py-3 px-4 rounded-lg font-medium transition-all cursor-not-allowed">
+                        Create Order
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let orderItems = [];
+let subtotal = 0;
+let tax = 0;
+let total = 0;
+
+// Category filtering
+function filterByCategory(categoryId) {
+    const buttons = document.querySelectorAll('.category-btn');
+    const items = document.querySelectorAll('.menu-item');
+    
+    // Update active button
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Filter items
+    items.forEach(item => {
+        if (categoryId === 'all' || item.dataset.category === categoryId) {
+            item.style.display = 'block';
+            item.classList.add('fade-in');
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Add item to order
+function addToOrder(element) {
+    const itemId = element.dataset.itemId;
+    const itemName = element.dataset.itemName;
+    const itemPrice = parseFloat(element.dataset.itemPrice);
+    
+    // Check if item already exists
+    const existingItem = orderItems.find(item => item.id === itemId);
+    
+    if (existingItem) {
+        existingItem.quantity += 1;
+    } else {
+        orderItems.push({
+            id: itemId,
+            name: itemName,
+            price: itemPrice,
+            quantity: 1
+        });
+    }
+    
+    updateOrderDisplay();
+    showNotification(`${itemName} added to order!`, 'success');
+}
+
+// Remove item from order
+function removeFromOrder(itemId) {
+    const itemIndex = orderItems.findIndex(item => item.id === itemId);
+    if (itemIndex > -1) {
+        const itemName = orderItems[itemIndex].name;
+        orderItems.splice(itemIndex, 1);
+        updateOrderDisplay();
+        showNotification(`${itemName} removed from order!`, 'warning');
+    }
+}
+
+// Update item quantity
+function updateQuantity(itemId, newQuantity) {
+    const item = orderItems.find(item => item.id === itemId);
+    if (item && newQuantity > 0) {
+        item.quantity = newQuantity;
+        updateOrderDisplay();
+    }
+}
+
+// Update order display
+function updateOrderDisplay() {
+    const orderItemsContainer = document.getElementById('order-items');
+    const createButton = document.getElementById('create-order-btn');
+    
+    if (orderItems.length === 0) {
+        orderItemsContainer.innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <i data-lucide="shopping-cart" class="w-8 h-8 mx-auto mb-2"></i>
+                <p class="text-sm">No items added yet</p>
+            </div>
+        `;
+        createButton.disabled = true;
+        createButton.className = "w-full bg-gray-300 text-gray-500 py-3 px-4 rounded-lg font-medium transition-all cursor-not-allowed";
+    } else {
+        let itemsHTML = '';
+        orderItems.forEach(item => {
+            itemsHTML += `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex-1">
+                        <p class="font-medium text-gray-900">${item.name}</p>
+                        <p class="text-sm text-gray-600">$${item.price.toFixed(2)} each</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="updateQuantity('${item.id}', ${item.quantity - 1})"
+                                class="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 hover:bg-gray-300 transition-colors">
+                            <i data-lucide="minus" class="w-3 h-3"></i>
+                        </button>
+                        <span class="w-8 text-center font-medium">${item.quantity}</span>
+                        <button onclick="updateQuantity('${item.id}', ${item.quantity + 1})"
+                                class="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-gray-600 hover:bg-gray-300 transition-colors">
+                            <i data-lucide="plus" class="w-3 h-3"></i>
+                        </button>
+                        <button onclick="removeFromOrder('${item.id}')"
+                                class="w-6 h-6 flex items-center justify-center bg-red-100 rounded text-red-600 hover:bg-red-200 transition-colors ml-2">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        orderItemsContainer.innerHTML = itemsHTML;
+        createButton.disabled = false;
+        createButton.className = "w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-all hover-scale";
+    }
+    
+    // Calculate totals
+    subtotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    tax = subtotal * 0.08;
+    total = subtotal + tax;
+    
+    // Update display
+    document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
+    document.getElementById('tax').textContent = `$${tax.toFixed(2)}`;
+    document.getElementById('total').textContent = `$${total.toFixed(2)}`;
+    
+    // Recreate icons
+    lucide.createIcons();
+}
+
+// Handle form submission
+document.getElementById('order-form').addEventListener('submit', function(e) {
+    if (orderItems.length === 0) {
+        e.preventDefault();
+        showNotification('Please add at least one item to the order!', 'error');
+        return;
+    }
+    
+    // Add order items to form data
+    const form = e.target;
+    orderItems.forEach((item, index) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = `items[${index}]`;
+        input.value = JSON.stringify(item);
+        form.appendChild(input);
+    });
+    
+    showLoading();
+});
+
+// Style active category button
+document.addEventListener('DOMContentLoaded', function() {
+    const categoryButtons = document.querySelectorAll('.category-btn');
+    categoryButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            categoryButtons.forEach(b => {
+                b.className = 'category-btn px-4 py-2 rounded-lg font-medium transition-all text-gray-600 bg-gray-100 hover:bg-gray-200';
+            });
+            this.className = 'category-btn active px-4 py-2 rounded-lg font-medium transition-all bg-blue-100 text-blue-700';
+        });
+    });
+    
+    // Set initial active state
+    document.querySelector('.category-btn').className = 'category-btn active px-4 py-2 rounded-lg font-medium transition-all bg-blue-100 text-blue-700';
+});
+</script>
+{% endblock %}

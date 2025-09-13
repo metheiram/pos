@@ -1,0 +1,241 @@
+{% extends 'pos/base.html' %}
+
+{% block title %}Billing - Restaurant POS{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Billing</h1>
+            <p class="text-gray-600">Process payment for Order {{ order.order_number }}</p>
+        </div>
+        <a href="{% url 'pos:order_detail' order.id %}" 
+           class="flex items-center px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors">
+            <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i>
+            Back to Order
+        </a>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Bill Details -->
+        <div class="bg-white rounded-xl shadow-sm p-6 fade-in">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Order Summary</h2>
+            
+            <!-- Order Info -->
+            <div class="mb-6 pb-6 border-b">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-600">Order Number:</p>
+                        <p class="font-semibold">{{ order.order_number }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600">Date:</p>
+                        <p class="font-semibold">{{ order.created_at|date:"M d, Y H:i" }}</p>
+                    </div>
+                    {% if order.table %}
+                    <div>
+                        <p class="text-gray-600">Table:</p>
+                        <p class="font-semibold">Table {{ order.table.number }}</p>
+                    </div>
+                    {% endif %}
+                    {% if order.customer_name %}
+                    <div>
+                        <p class="text-gray-600">Customer:</p>
+                        <p class="font-semibold">{{ order.customer_name }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Order Items -->
+            <div class="mb-6">
+                <h3 class="font-semibold text-gray-900 mb-4">Items</h3>
+                <div class="space-y-3">
+                    {% for item in order_items %}
+                    <div class="flex items-center justify-between py-2">
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-900">{{ item.menu_item.name }}</p>
+                            {% if item.special_instructions %}
+                                <p class="text-sm text-gray-500 italic">{{ item.special_instructions }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="text-right">
+                            <p class="font-medium">${{ item.unit_price }} x {{ item.quantity }}</p>
+                            <p class="text-sm text-gray-600">${{ item.get_total|floatformat:2 }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Totals -->
+            <div class="border-t pt-4">
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Subtotal:</span>
+                        <span class="font-medium">${{ order.subtotal|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Tax (8%):</span>
+                        <span class="font-medium">${{ order.tax_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between text-lg font-bold text-gray-900 border-t pt-2 mt-2">
+                        <span>Total:</span>
+                        <span>${{ order.total|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Payment Form -->
+        <div class="bg-white rounded-xl shadow-sm p-6 fade-in">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Payment Details</h2>
+            
+            <form method="post" action="{% url 'pos:process_payment' order.id %}" id="payment-form">
+                {% csrf_token %}
+                
+                <!-- Payment Method -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Payment Method</label>
+                    <div class="space-y-3">
+                        <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                            <input type="radio" name="payment_method" value="cash" class="text-green-600" checked>
+                            <i data-lucide="dollar-sign" class="w-5 h-5 mx-3 text-green-600"></i>
+                            <span class="text-gray-900 font-medium">Cash</span>
+                        </label>
+                        
+                        <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                            <input type="radio" name="payment_method" value="card" class="text-blue-600">
+                            <i data-lucide="credit-card" class="w-5 h-5 mx-3 text-blue-600"></i>
+                            <span class="text-gray-900 font-medium">Credit/Debit Card</span>
+                        </label>
+                        
+                        <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                            <input type="radio" name="payment_method" value="digital" class="text-purple-600">
+                            <i data-lucide="smartphone" class="w-5 h-5 mx-3 text-purple-600"></i>
+                            <span class="text-gray-900 font-medium">Digital Payment</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Payment Amount -->
+                <div class="mb-6">
+                    <label for="amount" class="block text-sm font-medium text-gray-700 mb-2">Payment Amount</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input type="number" 
+                               name="amount" 
+                               id="amount"
+                               value="{{ order.total }}"
+                               min="{{ order.total }}"
+                               step="0.01"
+                               class="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Minimum amount: ${{ order.total|floatformat:2 }}</p>
+                </div>
+                
+                <!-- Reference Number (for card/digital payments) -->
+                <div class="mb-6" id="reference-field" style="display: none;">
+                    <label for="reference_number" class="block text-sm font-medium text-gray-700 mb-2">Reference Number</label>
+                    <input type="text" 
+                           name="reference_number" 
+                           id="reference_number"
+                           placeholder="Transaction reference number"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <!-- Payment Summary -->
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-gray-600">Order Total:</span>
+                        <span class="font-semibold">${{ order.total|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-gray-600">Amount Received:</span>
+                        <span class="font-semibold" id="amount-received">${{ order.total|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-lg font-bold text-green-600 border-t pt-2">
+                        <span>Change:</span>
+                        <span id="change-amount">$0.00</span>
+                    </div>
+                </div>
+                
+                <button type="submit" 
+                        class="w-full bg-green-600 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:bg-green-700 transition-all hover-scale">
+                    <i data-lucide="check-circle" class="w-5 h-5 mr-2 inline"></i>
+                    Process Payment
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const orderTotal = {{ order.total }};
+
+// Handle payment method changes
+document.addEventListener('change', function(e) {
+    if (e.target.name === 'payment_method') {
+        const referenceField = document.getElementById('reference-field');
+        if (e.target.value === 'cash') {
+            referenceField.style.display = 'none';
+            document.getElementById('reference_number').required = false;
+        } else {
+            referenceField.style.display = 'block';
+            document.getElementById('reference_number').required = true;
+        }
+    }
+});
+
+// Handle amount changes
+document.getElementById('amount').addEventListener('input', function(e) {
+    const amount = parseFloat(e.target.value) || 0;
+    const change = Math.max(0, amount - orderTotal);
+    
+    document.getElementById('amount-received').textContent = `$${amount.toFixed(2)}`;
+    document.getElementById('change-amount').textContent = `$${change.toFixed(2)}`;
+    
+    // Change color based on sufficient amount
+    const changeElement = document.getElementById('change-amount');
+    if (amount >= orderTotal) {
+        changeElement.className = 'font-bold text-green-600';
+    } else {
+        changeElement.className = 'font-bold text-red-600';
+    }
+});
+
+// Form validation
+document.getElementById('payment-form').addEventListener('submit', function(e) {
+    const amount = parseFloat(document.getElementById('amount').value);
+    
+    if (amount < orderTotal) {
+        e.preventDefault();
+        showNotification('Payment amount cannot be less than the order total!', 'error');
+        return;
+    }
+    
+    showLoading();
+});
+
+// Quick amount buttons
+const amountInput = document.getElementById('amount');
+const quickAmounts = [orderTotal, orderTotal + 5, orderTotal + 10, orderTotal + 20];
+
+const quickButtonsContainer = document.createElement('div');
+quickButtonsContainer.className = 'flex gap-2 mt-2';
+quickButtonsContainer.innerHTML = quickAmounts.map(amount => 
+    `<button type="button" onclick="setAmount(${amount})" 
+             class="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 transition-colors">
+        $${amount.toFixed(2)}
+    </button>`
+).join('');
+
+amountInput.parentNode.appendChild(quickButtonsContainer);
+
+function setAmount(amount) {
+    document.getElementById('amount').value = amount.toFixed(2);
+    document.getElementById('amount').dispatchEvent(new Event('input'));
+}
+</script>
+{% endblock %}

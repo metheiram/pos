@@ -1,0 +1,86 @@
+{% extends 'pos/base.html' %}
+
+{% block title %}Login - Restaurant POS{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div class="max-w-md w-full mx-4">
+        <div class="bg-white rounded-xl shadow-lg p-8 fade-in hover-shadow transition-all">
+            <!-- Logo and Title -->
+            <div class="text-center mb-8">
+                <div class="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <i data-lucide="utensils" class="w-8 h-8 text-blue-600"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">Restaurant POS</h2>
+                <p class="text-gray-600">Sign in to your account</p>
+            </div>
+            
+            <!-- Login Form -->
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                    <div class="bg-red-100 border border-red-300 text-red-800 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <i data-lucide="alert-circle" class="w-5 h-5 mr-3"></i>
+                            {{ form.non_field_errors|first }}
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <div>
+                    <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Username
+                    </label>
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.username.errors|first }}</p>
+                    {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.password.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Password
+                    </label>
+                    {{ form.password }}
+                    {% if form.password.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.password.errors|first }}</p>
+                    {% endif %}
+                </div>
+                
+                <button type="submit" 
+                        class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium 
+                               hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all
+                               hover-scale">
+                    <div class="flex items-center justify-center">
+                        <i data-lucide="log-in" class="w-5 h-5 mr-2"></i>
+                        Sign In
+                    </div>
+                </button>
+            </form>
+            
+            <!-- Demo credentials info -->
+            <div class="mt-8 p-4 bg-gray-50 rounded-lg">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</h4>
+                <p class="text-xs text-gray-600 mb-1">Admin: admin / admin123</p>
+                <p class="text-xs text-gray-600">Staff: staff / staff123</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Add focus effects to form inputs
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputs = document.querySelectorAll('input[type="text"], input[type="password"]');
+        inputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.classList.add('scale-105');
+            });
+            input.addEventListener('blur', function() {
+                this.parentElement.classList.remove('scale-105');
+            });
+        });
+    });
+</script>
+{% endblock %}
